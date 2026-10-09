@@ -5,6 +5,8 @@
 > **Category**: Architecture
 > **Related**: [ADR-023](adr-023-ai-experimenter-lab.md) · [ADR-024](adr-024-expression-as-execution-target.md) · **[ADR-028](adr-028-tiered-extension-of-strategy-expression-capability.md)（配套：028 定表达能力，本 ADR 定资产住哪个进程）** · **[ADR-029](adr-029-ai-layer-2026-agent-practice-alignment.md)（配套：029 定 tools 门面协议、实验生命周期状态图、可观测性；本 ADR 定服务边界）** · [ADR-020](adr-020-engine-decomposition.md) · [ADR-008](adr-008-inter-service-comm.md) · [PRODUCT.md](../PRODUCT.md)
 > **Supersedes (部分)**: [ODR-021](../archive/odr/odr-021-p1-15-service-merge-risk-execution.md) 的「容器数 7 → 5」结论 —— 见 §2.1，**risk + execution 的合并判断本身保留**，本 ADR 只在其之上重新划分服务边界。⚠️ §2.6 追加策略服务与 reduction-service 后，服务数变为 **5（compose 容器 7）**，方向与 ODR-021 相反，理由见「代价 / 限制」
+> **Reconcile（OBS-10，2026-10-09）**：与 [ADR-019](adr-019-service-merge-ai-copilot.md)（2026-06-11 **Accepted**，7 服务 → 3 服务合并）方向相反需留痕——ADR-019 的**合并判断（risk / execution in-process）经 ODR-021 延续至今且全部保留**，本 ADR 只在其上重新划分独立服务边界；**反转的前提变了**：进程内核模块化（P0–P2）已把 11 个模块的边界 / 契约在进程内划清并冻结（内核线 K0–K7 已闭环），服务拆分是**可选的后续部署形态**而非推翻合并。不留此痕即成「019 说合并、027 说拆开」的自相矛盾。
+> **依赖方向（OBS-09 澄清，2026-10-09）**：027 → 028 → 029 曾互相引用成环，现澄清为**单向**——[ADR-028](adr-028-tiered-extension-of-strategy-expression-capability.md) / [ADR-029](adr-029-ai-layer-2026-agent-practice-alignment.md) 的**能力与协议**（L2 递推算子 / WASM host API / tools 门面）是本 ADR 服务拆分的**输入**；两者的内核落地部分（K3 / K6 / K7）已先行在进程内落地，**不构成本 ADR 的前置**。三份中唯一「待落地主体」是本 ADR 的服务拆分（5→7）；028 / 029 引用本 ADR 服务边界的条目已标注「待落地后重评」。
 > **Upstream**: 用户（若曦）2026-10-06 裁决 ——
 > 前三项（拆分形态 / storage 处置 / 死数据管道）+ 三轮头脑风暴追加六项
 > （延迟目标分层解决 / 因子注册表住策略服务 / 序列注册表 config 驱动 /

@@ -4,6 +4,7 @@
 > **Date**: 2026-10-06
 > **Category**: Architecture
 > **Related**: [ADR-007](adr-007-ai-sandbox.md)（沙箱 · Phase 3 WASM）· [ADR-015](adr-015-ai-agent-architecture.md)（Go-native agents，已弃用）· [ADR-019](adr-019-service-merge-ai-copilot.md) · [ADR-023](adr-023-ai-experimenter-lab.md)（三层模型 · 验证器链 · 校准优于准确）· [ADR-024](adr-024-expression-as-execution-target.md) · [ADR-027](adr-027-modular-decomposition-to-independent-services.md) · [ADR-028](adr-028-tiered-extension-of-strategy-expression-capability.md) · [PRODUCT.md](../PRODUCT.md)
+> **依赖方向（OBS-09 澄清，2026-10-09）**：与 [ADR-027](adr-027-modular-decomposition-to-independent-services.md) 的引用不再是环——**轨道 B 的 WASM 沙箱（K6，wazero）与外部信号注入（K7）已随内核线在进程内落地**，不依赖 027 的服务拆分；涉及 027 **服务边界**的条目（§2.6.2 tools 门面端点、图 B 的 ② 通道跨服务形态、§Context⑪ experiment DTO 归属）**显式挂起：待 ADR-027 服务拆分落地后重评**。
 > **Supersedes (部分)**:
 > - **ADR-024 的「表达式是唯一执行载体」** —— 改为**双轨**（表达式 + WASM）。但 ADR-024 的**三条理由（起点确定 / 可审阅 / 可复现）与「不做 `plugin.Open`」的裁决全部保留**，见 §2 与 §3
 > - **ADR-015**（Go-native agents 作为自主研究层）—— 已由 ODR-046 事实上弃用，本 ADR 正式收口
