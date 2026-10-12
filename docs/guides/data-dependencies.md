@@ -92,8 +92,8 @@ xueqiu / juchao）、要么缺的是**代码依赖而不是 key**（mootdx 缺 G
 | `PMI` | `cn_pmi` | M | `month` / `pmi010000` | 5000（官方页） | 261（2005-01 → 2026-09） |
 | `M2` | `cn_m` | M | `month` / `m2` | 600 | 407（1990-12 → 2026-08） |
 | `M2_YOY` | `cn_m` | M | `month` / `m2_yoy` | 同上（共用请求） | 373（1991-12 → 2026-08） |
-| `TSF_INC` | `sf_month` | M | `month` / `sf_inc` | 600 | 296（2002-01 → 2026-08） |
-| `LPR_1Y` | `shibor_lpr` | D | `date` / `1y` | 600 | 1532（2013-10-25 → 2026-08-20） |
+| `TSF_INC` | `sf_month` | M | `month` / `inc_month` | 2000 | 296（2002-01 → 2026-08） |
+| `LPR_1Y` | `shibor_lpr` | D | `date` / `1y` | 120（正式权限 5000） | 1532（2013-10-25 → 2026-08-20） |
 | `LPR_5Y` | `shibor_lpr` | D | `date` / `5y` | 同上（共用请求） | 见下方流控注记 |
 | `USDCNY_CLOSE` | `fx_daily` | D | `trade_date` / `bid_close`（`ts_code=USDCNH.FXCM`） | 2000 | 2410（2019-01-02 → 2026-10-11） |
 
@@ -104,6 +104,8 @@ xueqiu / juchao）、要么缺的是**代码依赖而不是 key**（mootdx 缺 G
    → normalize 必须**大小写不敏感**匹配列名。
 2. **`shibor_lpr` 限 1 次/小时**：实测返回
    `40203 抱歉，您访问接口(shibor_lpr)频率超限(1次/小时)`。
+   ⚠️ 官方页（doc_id=151）标称「500 次/min」，与实测的「1 次/小时」**冲突**；
+   以实测为准——标称是上限，实测才是你真会撞到的墙。
    → LPR_1Y / LPR_5Y **必须共用一次请求**（`FetchMacroIndicators` 按 `APIName`
    分组，同接口的多个 indicator 从同一份响应各取各的列），也**不能按年分段**
    （分段要 14 次请求，必然撞限）。改回逐条拉取 = 第二个 LPR 永远拉不到。
