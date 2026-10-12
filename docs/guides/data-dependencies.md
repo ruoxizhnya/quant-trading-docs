@@ -58,25 +58,61 @@ xueqiu / juchao）、要么缺的是**代码依赖而不是 key**（mootdx 缺 G
 
 ## 二、四项 P2 各需要什么
 
-### P2-1 补宏观 / 跨境数据源 — **跨境已完成，宏观是真空白**
+### P2-1 补宏观 / 跨境数据源 — **跨境已完成；宏观已落地（2026-10-12 实测）**
 
 - **跨境（美股等境外行情）**：**已做完**。链已配
   `global_ohlcv: [yahoo_finance, alpha_vantage]`（yahoo 免 key 为主、alpha 为辅）。
   登记里「新建 adapter」这个说法对跨境这一半**已经过时**。
-- **宏观（汇率 / 利率 / 大宗）**：**真空白**。`pkg/data/source/adapter.go` 的
-  DataType 常量里只有行情/资金流/财务/板块/公告/新闻，**没有任何宏观类型**。
-  所以宏观要新增 DataType 常量 + adapter，不是填个 key 就能用。
+- **宏观（汇率 / 利率 / 物价 / 货币）**：**已落地**（2026-10-12）。
+  Migration 050 建 `quant.macro_series`；`pkg/data/source` 新增 `DataTypeMacro`
+  常量 + `TushareMacroAdapter`；只读 API `GET /api/macro/series`。
+  跨境之外的另一半（大宗 / 境外宏观）**仍未接**，属后续工单。
 
 候选源与代价：
 
 | 源 | 覆盖 | 凭据 | 代价 |
 |---|---|---|---|
-| Tushare 宏观接口（`cn_cpi` 一类） | 国内宏观 | **复用 `TUSHARE_TOKEN`** | 0 个新 key，但吃积分 |
-| Alpha Vantage | FX / 大宗 / 美债收益率 | **复用 `ALPHA_VANTAGE_KEY`** 槽位 | 0 个新 key；**免费档 25 req/day**（历史上 500→100→25 一路收紧），只够探测，不够批量 |
+| **Tushare 宏观接口** | 国内宏观 | **复用 `TUSHARE_TOKEN`** | 0 个新 key，但吃积分 —— **已选这条** |
+| Alpha Vantage | FX / 大宗 / 美债收益率 | **复用 `ALPHA_VANTAGE_KEY`** 槽位 | 0 个新 key；**免费档 25 req/day**，只够探测，不够批量 |
 | FRED（美联储） | 美国利率 / 宏观 | 免费注册拿 key | 1 个新 key，免费 |
 | World Bank | 跨境宏观 | 无 | 0 个新 key，免费 |
 
-**结论**：选 Tushare 路线 → **新增 0 个 key**；选 FRED → 新增 1 个免费 key。
+**结论**：选 Tushare 路线 → **新增 0 个 key**，已落地。
+
+#### 实测接口清单（2026-10-12，真 token 逐个探测，不是文档推断）
+
+> ⚠️ 上一版这里写「除 `cn_cpi` 外接口名与积分**未核实**」。以下全部是用仓库
+> `.env` 里的真 token 逐个 POST `api.tushare.pro` 探出来的，**code:0 且有真数据**
+> 才算通过。第三方博客给的 doc_id 映射不可信（实测 3 个错的）。
+
+| indicator | tushare 接口 | 频 | 日期列 / 数值列 | 官方积分 | 入库行数（真库） |
+|---|---|---|---|---|---|
+| `CPI_YOY` | `cn_cpi` | M | `month` / `nt_yoy` | 600 | 512（1951-12 → 2026-08） |
+| `PPI_YOY` | `cn_ppi` | M | `month` / `ppi_yoy` | 600 | 377（1978-12 → 2026-08） |
+| `PMI` | `cn_pmi` | M | `month` / `pmi010000` | 5000（官方页） | 261（2005-01 → 2026-09） |
+| `M2` | `cn_m` | M | `month` / `m2` | 600 | 407（1990-12 → 2026-08） |
+| `M2_YOY` | `cn_m` | M | `month` / `m2_yoy` | 同上（共用请求） | 373（1991-12 → 2026-08） |
+| `TSF_INC` | `sf_month` | M | `month` / `sf_inc` | 600 | 296（2002-01 → 2026-08） |
+| `LPR_1Y` | `shibor_lpr` | D | `date` / `1y` | 600 | 1532（2013-10-25 → 2026-08-20） |
+| `LPR_5Y` | `shibor_lpr` | D | `date` / `5y` | 同上（共用请求） | 见下方流控注记 |
+| `USDCNY_CLOSE` | `fx_daily` | D | `trade_date` / `bid_close`（`ts_code=USDCNH.FXCM`） | 2000 | 2410（2019-01-02 → 2026-10-11） |
+
+#### 三个坑（实测推翻文档，动手前先看）
+
+1. **`cn_pmi` 响应字段是大写**（`MONTH` / `PMI010000`），与文档的小写不一致；
+   `fields` 参数传小写仍有效（实测 `fields=month,pmi010000` 正常返回）。
+   → normalize 必须**大小写不敏感**匹配列名。
+2. **`shibor_lpr` 限 1 次/小时**：实测返回
+   `40203 抱歉，您访问接口(shibor_lpr)频率超限(1次/小时)`。
+   → LPR_1Y / LPR_5Y **必须共用一次请求**（`FetchMacroIndicators` 按 `APIName`
+   分组，同接口的多个 indicator 从同一份响应各取各的列），也**不能按年分段**
+   （分段要 14 次请求，必然撞限）。改回逐条拉取 = 第二个 LPR 永远拉不到。
+3. **`fx_daily` 单次限量 1000 行（文档）但实测返回 2410 行不截断**。
+   → **不依赖未文档化行为**，仍按年分段（每年 ~300 行，8 段）。
+
+> **40203 ≠ token 无效**（那是 40101）。本轮 9 个接口全部 `code:0`，token 积分
+> 足够 —— 撞 40203 只说明**该接口撞了流控**，不是没权限（对比 P2-8 的
+> `stk_factor_pro` 才是真的无权限）。
 
 ### P2-2 产业链数据底座 `query_supply_chain(name)` — **新增 0 个 key**
 
