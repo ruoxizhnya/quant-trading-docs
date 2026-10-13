@@ -6,6 +6,8 @@ verified-by: AUD-44 路径引用复核 + AUD-47 §5–§7 内容复核（2026-09
 
 # Test Plan & Quality Assurance (TEST.md)
 
+> **AUD-61 归属变更（2026-10-14）**：e2e 套件随前端拆仓（2026-10-09）后物理属 `quant-trading-ui/e2e`，工单已从 core 主线迁至 **`quant-trading-ui/docs/TASKS.md`**（前端正处设计系统重构，e2e 将大改）。本文 §7.2 的 34 条红历史读数保留为取证记录；后续 fixme 登记与逐页对齐进度以 UI 仓工单为唯一真相源。
+
 > **Version:** 1.1.0 (AGENTS Template v2.0 Migration)
 > **Owner:** 龙少 (Longshao) — AI Assistant
 > **Related:** [VISION.md](VISION.md) (product), [ADR.md](ADR.md) (architecture), [SPEC.md](SPEC.md) (implementation)
@@ -555,7 +557,7 @@ docker compose up -d --force-recreate --no-deps analysis-service data-service
 > （`.gitignore` 忽略 `e2e/tests/visual-regression.spec.ts-snapshots/`），
 > 报的是 `A snapshot doesn't exist … writing actual`，**不是** mismatch。
 > 注意区分：**本机已有快照时仍有 9 条红**（见 §7.2.0），那部分是**真的 mismatch**
-> —— 页面结构在快照生成之后已变（与 AUD-61 同源）。
+> —— 页面结构在快照生成之后已变（与 AUD-61 同源，工单现居 `quant-trading-ui/docs/TASKS.md`）。
 
 **Test Suites:** **18** 个 spec 文件、**163** 条用例（`npx playwright test --list` 实测，
 2026-09-25 AUD-58 这轮复核 —— 此前的「17 / 160」少算了 ADR-026 新增的 `auth-login-flow`）：
@@ -590,7 +592,7 @@ AUD-58 / AUD-59 / AUD-60 的改动（那轮改动与 `web/`、`e2e/tests/` **零
 | 测试隔离缺陷 | 1 | `sync_schedules.name` 唯一约束残留（用例固定名 + 失败不走 cleanup ⇒ **第二次跑必红**；日志 `duplicate key value violates unique constraint "sync_schedules_name_key"`） |
 | 超时（无断言失败） | 2 | — |
 
-⇒ 登记为 **AUD-61**（见 `TASKS.md`）。**不要**把「34 条红」写进任何「已验证通过」的结论
+⇒ 登记为 **AUD-61**（2026-10-14 起见 `quant-trading-ui/docs/TASKS.md`，原 core `TASKS.md` 只留迁移指针）。**不要**把「34 条红」写进任何「已验证通过」的结论
 （那是把假信号洗白），也**不要**用「放宽断言」消红。
 
 > ⚠️ **UI 用例另有一个「前端宿主」前置**：`e2e/playwright.config.ts` 的 `BASE_URL`
