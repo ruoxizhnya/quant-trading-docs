@@ -29,6 +29,7 @@ verified-by: 人工整理（文档体系重组）
 | 了解测试策略 | [TEST.md](TEST.md) | 现行 |
 | 看阶段规划 | [ROADMAP.md](ROADMAP.md) | 现行 |
 | 本地起步（环境 / 命令 / 已知坑） | [guides/local-dev.md](guides/local-dev.md) | 现行 |
+| NT 侧车运维（版本升级 / 故障回退） | [guides/nt-sidecar-operations.md](guides/nt-sidecar-operations.md) | 现行 |
 | 加数据源 / 加因子 / 跑一轮实验 | — | 待补（S1 / S3 开工前再写） |
 | 实盘接口（核心抽象实盘-ready，仅 paper 实现） | [live-trading.md](live-trading.md) | 已标注 |
 | **当前在做什么** | [TASKS.md](TASKS.md) | 现行（只放未完成项） |
