@@ -47,7 +47,7 @@ verified-by: AUD-30 索引表与「已取代」尾注校准（2026-09-22）—�
 | [ADR-028](adr/adr-028-tiered-extension-of-strategy-expression-capability.md) | 策略表达能力分层扩展 — DSL 分层 + 算子声明契约（含 `state` 字段预留）；定位由 ADR-029 调整为「轨道 A 的能力扩展」 | **Proposed** | 2026-10-06 |
 | [ADR-029](adr/adr-029-ai-layer-2026-agent-practice-alignment.md) | AI 层 2026 agent 实践对齐 — 双轨执行载体（轨道 A 表达式 / 轨道 B WASM）；确定性状态图；上下文经济；可观测性 | **Proposed** | 2026-10-06 |
 | [ADR-030](adr/adr-030-draft-observed-improvements.md) | 观察到的改进点清单（vnpy/nautilus/本项目三框架对比源码取证，OBS-01~15）—— 不取代任何 ADR，仅登记 | **Draft（未裁决）** | 2026-10-07 |
-| [ADR-031](adr/adr-031-kernel-pluggable-nt-ready.md) | **内核可插拔 + 外围服务 NT-ready** —— buy vs build 路线：四契约（RunSpec/SignalSpec/ResultSpec/EngineRunner）冻结内核边界 + NT 侧车「信号—权重回放适配器」（Go 策略资产零重写）+ 分阶段 6–10/10–16/6–10 人周 + 阶段 2 后决策门；整体替换否决；「后端必须 Go」修订为「生产后端 Go、实验/执行侧车允许 Python（进程隔离）」 | **Accepted**（阶段 3 待决策门） | 2026-10-12 |
+| [ADR-031](adr/adr-031-kernel-pluggable-nt-ready.md) | **内核可插拔 + 外围服务 NT-ready** —— buy vs build 路线：四契约（RunSpec/SignalSpec/ResultSpec/EngineRunner）冻结内核边界 + NT 侧车「信号—权重回放适配器」（Go 策略资产零重写）+ 分阶段 6–10/10–16/6–10 人周 + 阶段 2 后决策门；整体替换否决；「后端必须 Go」修订为「生产后端 Go、实验/执行侧车允许 Python（进程隔离）」 | **Accepted**（决策门 2026-10-14 已裁决：① 推进生产化，阶段 3 随 K16 落地；VeighNa 并列评估取消；K4 impact 维持默认 fixed——见 D4 末尾裁决记录） | 2026-10-12 |
 
 ---
 

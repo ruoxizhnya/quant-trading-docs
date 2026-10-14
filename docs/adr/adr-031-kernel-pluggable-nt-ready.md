@@ -1,6 +1,6 @@
 # ADR-031: 内核可插拔 + 外围服务 NT-ready —— buy vs build 路线（NautilusTrader 侧车，整体替换否决）
 
-> **Status**: **Accepted**（2026-10-12 若曦拍板固化）——阶段 1（契约化）与阶段 2（NT 侧车 PoC）立即执行；阶段 3（双内核生产化）与「Go 内核是否退役」由阶段 2 后的**决策门**裁决。
+> **Status**: **Accepted**（2026-10-12 若曦拍板固化）——阶段 1（契约化）与阶段 2（NT 侧车 PoC）立即执行；**决策门已于 2026-10-14 裁决（若曦拍板）：① 推进生产化**，阶段 3 随 K16 落地，详见 D4 末尾「决策门裁决记录」。
 > **Date**: 2026-10-12
 > **Category**: Architecture
 > **Related**: [ADR-027](adr-027-modular-decomposition-to-independent-services.md) · [ADR-028](adr-028-tiered-extension-of-strategy-expression-capability.md) · [ADR-029](adr-029-ai-layer-2026-agent-practice-alignment.md) · [ADR-030](adr-030-draft-observed-improvements.md) · core 仓 `docs/design/kernel/nautilus-trader-kernel-evaluation.md`（NT 深度调研，2026-10-12）· core 仓 `docs/design/kernel/kernel-pluggable-nt-ready.md`（需求与设计）· core 仓 `docs/design/kernel/target-architecture-modular-kernel.md`（模块化内核蓝图，D1–D5）
@@ -72,6 +72,11 @@ Dashboard 与 AI 层**近零改造**（只依赖 canonical 结果 schema，不�
 
 **决策门（阶段 2 完成后）**：凭「双跑对齐数据 + NT v2.0.0 正式版发布」裁决——① 生产化推进 / ② 长期双内核 / ③ 停在阶段 1 回退；届时 VeighNa（A 股覆盖更好的 Python 候选）并列评估；K4 遗留的「impact 是否默认滑点」也在此门一并裁决。
 
+> **✅ 决策门裁决记录（2026-10-14，若曦拍板）**：
+> **裁决一（三选一 → ① 推进生产化）**：凭 K15 双跑数据（2024 全年两标的 × 两信号流，total_return |Δ| ≤ 0.086%、实测容差 ≤0.2%、CI `align-gate` 门禁上线，报告见 core 仓 `docs/design/kernel/k15-dualrun-report.md`）+ K16 六件套落地（2026-10-13，阶段 3 实际已推进），正式化为「推进生产化」。③ 回退（废弃侧车、落「借鉴设计增强 Go 内核」）**降级为「NT 正式版升级失败」的兜底路径**，不再是并列选项。版本锁定策略同步收口：**钉 rc6（`nautilus_trader==2.0.0rc6`）、不追 nightly**；NT v2.0.0 正式版发布后按 `guides/nt-sidecar-operations.md` 升级预案收口，**双跑对齐回归为升级验收门**。
+> **裁决二（VeighNa 并列评估：取消）**：其触发条件是「诉求确认为『Python + 中国市场』」——从头未成立：生产后端必须 Go（D5），Python 仅侧车且已被 NT 以双跑对齐验证占住。VeighNa 主场是期货 CTA + A 股柜台网关接入（中泰 XTP/国君 HFT/华鑫/东方 OST/CTP 等），非日频股票回测内核；且评估它需为第二个 Python 引擎复刻 K14+K15 全套对齐资产（费率 parity + 权重回放 + 逐指标 diff），无对齐基线可比。其真正价值（A 股柜台网关）属将来**实盘接入阶段**的选型问题，届时以**网关候选**单独评估，不作为回测内核候选。
+> **裁决三（K4 impact 默认滑点：维持 `fixed`）**：`"impact"` 保留为显式选项（`ExecutionConfig.ImpactSigma`），不设默认——现阶段 ADV 以当根 `quote.Volume` 代理，证据不足以支撑默认；K15 双跑基线以滑点=0 跑出，翻默认会使基线失效需整体重跑；**待有真实成交回执数据后单独再裁**（届时可用实测滑点校准模型参数）。
+
 ### D5 · 约束修订（显式）：「后端必须 Go」
 
 原工程约束「后端必须使用 Go」修订为：
@@ -111,9 +116,9 @@ Dashboard 与 AI 层**近零改造**（只依赖 canonical 结果 schema，不�
 - **与 ADR-012（strategy-service standby）兼容**：`SignalProvider` 的远程实现是将来形态，strategy-service 维持 standby 不变。
 - **任务落地**：core 仓 `docs/TASKS.md` 新主线 K8–K16（阶段 1–3）；K7 遗留①②、OBS-01 遗留①②、K0-P2-1、K1-P2-1~4 按调研报告 §8.6 并入对应新任务。**K1-P2-1~4 已由 K12 收口（2026-10-12，D1 稳定性前置）**：① Boot ctx 语义裁决为「仅限调用期间」（契约注释 + `TestLifecycleCtxIsCallScoped` 钉住，保留超时中断能力）；② 回滚期 Stop 失败并进返回 error（不静默）；③ **资源归属裁决：连接池是应用层资源**（`EventStoreModule.Stop` 不关 pool，谁构造谁释放，同步 core 仓 kernel 蓝图 §4.2 与 `adapters.go` 注释）；④ 「模块不得在生命周期方法内回调 `Module()`」契约化 + AST 护栏（`internal/repoguard`）。
 
-## 未决问题（[TBD]，到决策门前必须关闭）
+## 未决问题（决策门 2026-10-14 全部关闭）
 
-- [TBD] 双跑数值对齐的容差阈值（按指标分别定义，须在阶段 2 实验中实测确定）。
-- [TBD] NT 版本锁定策略（PoC 钉 rc 版本还是跟随；v2.0.0 正式版发布时间表）。
-- [TBD] Parquet 导出的复权口径与 `ohlcv_daily_qfq` 的对应关系（阶段 2 数据馈送任务内裁决）。
-- [TBD] 侧车的部署形态（compose 服务 vs 独立进程）与监控口径。
+- ~~[TBD] 双跑数值对齐的容差阈值~~ → **已关闭（K15 实测，2026-10-13）**：per-metric 阈值表写回设计文档 §8 表 1（total_return/annual ≤0.2%、sharpe/sortino/calmar ≤0.05 绝对、maxDD ≤0.5%；win_rate 与 total_trades 不设硬阈，笔数守恒由 fills 对账腿执法），门禁执法者 = `cmd/dualrun -gate`（CI `align-gate` job）。
+- ~~[TBD] NT 版本锁定策略~~ → **已关闭（决策门裁决一）**：钉 `nautilus_trader==2.0.0rc6`、不追 nightly；正式版发布后按升级预案收口，双跑对齐回归为验收门。
+- ~~[TBD] Parquet 导出的复权口径~~ → **已关闭（K13，§8.2）**：`ohlcv_daily_qfq` 原样消费（不做二次复权）+ UTC 午夜纳秒时间戳。
+- ~~[TBD] 侧车部署形态与监控口径~~ → **已关闭（K16，§8.6）**：compose 服务（`docker-compose.nt.yaml`）+ 健康检查 + 监控指标（`nt_sidecar_calls_total{outcome}` 等）；运维文档在 `guides/nt-sidecar-operations.md`。
