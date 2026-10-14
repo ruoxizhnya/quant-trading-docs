@@ -9,7 +9,9 @@ verified-by: K16 ③ 交付时逐条对代码核实——§1 三条纪律与 API
   核对；§6 微坑全部来自 K15-R1 / K16 ② 实测踩坑记录。
   §4（D7 市场档案与原生模式）由 D7 交付时核实：`--market` 参数与
   `sidecar/markets.py` 的档案表逐字核对；§4.4 的两处导出缺陷经真库实测复现，
-  并已验证「补齐后重导 catalog ⇒ `cmd/dualrun -gate` 全绿」（2026-10-14）。
+  并已验证「补齐后重导 catalog ⇒ `cmd/dualrun -gate` 全绿」（2026-10-14）；
+  同日按口径裁定（成交量单位 = 股）**正式修复**并复验（详见 §4.4 末「已修复」段，
+  含对国内线数值影响与尚未覆盖的 fallback 缺口）。
 ---
 
 # NT 侧车运维：版本升级与故障回退
@@ -162,7 +164,10 @@ cd nt-sidecar
 2. `config/analysis-service.yaml` 的 `kernel_routing.markets` 加一行（市场 → 内核）。
 3. 为该市场准备数据 connector + catalog（本工单范围外，见 D9 选型报告）。
 
-### 4.4 已知阻断（2026-10-14，**不属于 D7**，登记在此因为影响本节运维动作）
+### 4.4 导出路径与成交量单位（2026-10-14 已修复）
+
+> 历史沿革：本节原名「已知阻断（不属于 D7）」。下面的问题描述**保留原样**作为
+> 证据链（记录当时的实测形态），修复记录见本节末「已修复」段。
 
 §3 说「底表刷新后重跑导出」——**该动作当前会失败**。两处独立缺陷，都在 D1
 （commit `b49629e`）引入的导出路径上：
@@ -183,9 +188,46 @@ cd nt-sidecar
 「对齐门禁通过：全部指标在 K15 阈值内，确定性腿一致，无成交 mismatch」——
 **对齐本身完好，红灯纯属产物陈旧**。
 
-**为什么不当场修**：第 2 条是**口径裁决**（成交量单位：手 vs 股，取整/换算发生在
+**为什么当时不当场修**：第 2 条是**口径裁决**（成交量单位：手 vs 股，取整/换算发生在
 规范层还是翻译层，见 `mapping.py` 的「换算请在规范层做」注释），改它会动国内线的
 数值；D7 的 ④ 约束明令「不动国内对拍线现状」。须另立工单把口径定死后修。
+
+**已修复（2026-10-14）**：口径定死为规范层**已经声明**的单位「股」
+（`SPEC.md` 规范层 Schema 的 OHLCV.Volume 一直写「成交量（股）」，前端
+`utils/format.ts` 的 `fmtVolume` 也按股格式化 —— 是**实现违背了已写明的契约**），
+两处缺陷随之消解：
+
+1. **字段名（已修）**：`export_bars.py` 的 SELECT 改输出规范层列名
+   `trade_date AS date`。改 SELECT 而不改映射表是因为 `date` 是跨语言契约定下的
+   json tag（"加一种数据类 = 映射加一行"的机制不动）。
+2. **成交量单位（已统一）**：
+   - 同步侧 `pkg/data` 按 `sharesPerLot`（一手 = 100 股）换算 + `math.Round`。
+     取整是必须的：真库 392.6 万行里 **37 万行**的 `volume×100` 在 float64 下
+     不是精确整数（最大误差 4.77e-07），不取整会被 `as_quantity` 的
+     `is_integer()` 判成「不是整数」→ 整批数据被判损坏。
+   - 存量由 **migration 052**（`pkg/storage/postgres.go` 的
+     `migrationStatements()`，文档副本 `docs/migrations/052_ohlcv_volume_lots_to_shares.sql`）
+     对齐。幂等守卫：×100 **不**幂等，故不写逐行 WHERE（真库 **19.24%** 的行
+     volume 本来就是整数「手」，逐行条件会漏掉它们 → 半股半手的混合表），
+     改为先问一次「库里还有没有非整数（= 手的小数）」，有才整表换算一次。
+   - `as_quantity` 本身**不需要改**：上游已是整数股，它的整数纪律继续生效。
+
+**验证（2026-10-14 实测）**：导出真跑通过（catalog 值 = 库值，逐条一致，全整数）；
+`go run ./cmd/dualrun -strategy bh -gate` 输出「对齐门禁通过：全部指标在 K15 阈值内，
+确定性腿一致，无成交 mismatch」——**对拍恢复全绿**。破坏验证三组（删 date 别名 /
+去 ×sharesPerLot / 去 math.Round）均改坏变红、还原变绿。
+
+**对国内线数值的影响**：volume 数值整体 ×100，其中两处是**修正既有量纲错位**
+（订单量的单位是股，此前却与「手」相比）：`pkg/backtest/tracker` 的流动性阈值
+`maxLiquidity = volume × 0.1` 此前偏小 100 倍；`pkg/execution` 的 impact 滑点
+`orderQty/adv` 此前偏高 100 倍（默认 `SlippageModel="fixed"`，故默认不生效）。
+因对拍的两内核同源同变，对齐仍在 K15 阈值内。
+
+**尚未覆盖（登记在案）**：日线 fallback 链还有 mootdx / eastmoney
+（`cmd/data/registry_init.go` 的 `DataTypeOHLCDaily` 链 = tushare → mootdx →
+eastmoney）。mootdx 的 `vol` 单位在项目内**无实测依据**（TDX 惯例是「手」），
+本单**未改**——启用该 fallback 前须实测并用同一 ×100 对齐。当前
+`ohlcv_daily_qfq` 的 392.6 万行全部来自 tushare，故该缺口不影响现网。
 
 ---
 
