@@ -19,7 +19,7 @@ verified-by: D9 执行 agent——每条事实均带引文与采集日期（附�
 
 ## 0. 结论速览（可直接抄进后续工单 ②上下文）
 
-1. **主选：Databento（`nt_native` 通道）**。它是 NT **官方 adapter 清单内**唯一覆盖国外股票/期货的纯数据通道（rc6 与 rc7 官方表一致），数据模型自带四时间戳（`ts_event`/`ts_recv`/`ts_in_delta`/`ts_out`，ns 精度、PTP/GPS 同步、`ts_recv` 按 symbol 单调），**时间语义既「可声明」又「由引擎执行层强制」**（NT 回测按 `ts_init` 稳定排序喂数据）。【事实+判断】
+1. **主选：Databento（`nt_native` 通道）**。在 NT 官方 adapter 清单（rc6 与 rc7 官方表逐行一致）中，它是**唯一覆盖国外股票/期货的 Data-only adapter**——其余股票/期货类 adapter（IBKR 等）均为 `Data/Execution` 且需经纪账户，另两个 `Data` 型 adapter（Blockchain / Tardis）只做链上与 crypto 历史，数据模型自带四时间戳（`ts_event`/`ts_recv`/`ts_in_delta`/`ts_out`，ns 精度、PTP/GPS 同步、`ts_recv` 按 symbol 单调），**时间语义既「可声明」又「由引擎执行层强制」**（NT 回测按 `ts_init` 稳定排序喂数据）。【事实+判断】
 2. **零成本样例通道：交易所 crypto（Binance / Bybit / OKX，均 NT 官方 adapter）**。供 D7「一个国外市场样例 run」立即跑通用；不入主链路。【判断】
 3. **外部候选（需自写 connector 进规范层）**：Polygon（已更名 **Massive**）、Tiingo、Tushare `us_daily`。三者 **无 NT 官方 adapter** ⇒ 接入成本高于 Databento。【事实+判断】
 4. **一票否决已生效**：Yahoo/yfinance、`Tushare us_daily_adj`、以及 Polygon/Tiingo 的**复权序列**（`adjusted=true` / `adjClose`）**时间语义声明不了**（值会被未来事件回溯改写）⇒ **排除**；但同源的**未复权**形态可以保留（同一源两种用法，一个死一个活）。【事实】
@@ -33,7 +33,7 @@ verified-by: D9 执行 agent——每条事实均带引文与采集日期（附�
 
 | 维度 | 覆盖 | 不覆盖（边界外，另立） |
 |---|---|---|
-| 市场 | 国外股票（美股为主）、国外期货、crypto | A 股（国内线，已有 Tushare/mootdx）、中国香港市场（license 与通道另成一档，见 §6.6） |
+| 市场 | 国外股票（美股为主）、国外期货、crypto | A 股（国内线，已有 Tushare/mootdx）、中国香港市场（license 与通道另成一档，见 §6.5） |
 | 数据类 | 行情（OHLCV / tick / 订单簿） | 国外基本面、另类数据（属未来 connector 工单） |
 | 频率 | 日频、分钟频、事件流 | 逐笔撮合精度升级（另立工单） |
 
@@ -115,7 +115,7 @@ verified-by: D9 执行 agent——每条事实均带引文与采集日期（附�
 
 ## 5. 候选登记表（机器可读，供工单与校验脚本消费）
 
-> 下表是本报告的**唯一登记表**，§8 的校验脚本直接解析它；后续 connector 工单可直接抄 `id` 与 `declared_time_semantics`。
+> 下表是本报告的**唯一登记表**，**附录 B** 的校验脚本直接解析它；后续 connector 工单可直接抄 `id` 与 `declared_time_semantics`。
 
 ```json
 {
@@ -373,9 +373,9 @@ verified-by: D9 执行 agent——每条事实均带引文与采集日期（附�
 
 | # | 改坏动作 | 预期 | 实测 | 还原后 |
 |---|---|---|---|---|
-| B1 | 把 X1（yfinance）的 `ts_declarable` 由 `false` 改为 `true`（给被排除源"放水"） | A4 红 | **红**（exit 1，点名 X1） | 绿，sha256 与基线一致 |
+| B1 | **重新启用被硬判据排除的源**：X1（yfinance）`verdict: exclude → alternative` | A3 + A4 红 | **红**（exit 1；A3、A4 两条均点名 X1） | 绿，sha256 与基线一致 |
 | B2 | 删除「## 7. 接口需求清单」章节标题 | A1 红 | **红**（exit 1，点名缺章节） | 绿，sha256 与基线一致 |
-| B3 | 把 X2 的 `verdict` 改成 `recommend_primary`（让重述序列当主选） | A3 红 | **红**（exit 1，点名 X2） | 绿，sha256 与基线一致 |
+| B3 | **让重述序列当主选**：X2（`us_daily_adj`）`verdict: exclude → recommend_primary` | A3 + A4 + A5 红 | **红**（exit 1；三条断言点名 X2） | 绿，sha256 与基线一致 |
 
 **结论**：硬判据不是只写在文档里——A3/A4 两条断言使「被排除的源被重新启用」与「重述序列被推荐」这两种漂移**当场变红**。
 
@@ -485,7 +485,7 @@ if __name__ == "__main__":
 **执行环境**：Windows / Python 3.13.14（stdlib-only，无第三方依赖）；校验脚本由**附录 B 的代码块原样提取**执行（非另写一份，保证「文档里那份」就是「跑过的那份」）。
 
 ```
-baseline sha256 = 1c7848b83b19f295a801f78763c65aa82dce3c910a24b02fd13f1c64d262324c
+baseline sha256 = 7cc34da177aa20d3bc0a3af34137da3ee8120e70d11342181dd54b83ea7b1d9b
 [BASELINE] python d9_check.py <report>
   exit=0
   GREEN — 断言全通过（候选项 10：nt_native 3 / external 7；接口需求 16 条）
@@ -523,13 +523,15 @@ baseline sha256 = 1c7848b83b19f295a801f78763c65aa82dce3c910a24b02fd13f1c64d26232
 
 **⚠️ 过程记录（如实）**：B1 的第一版设计是「把 X1 的 `ts_declarable` 由 `false` 改成 `true`」，**实测 exit=0 未变红**——因为当时的 A3 只覆盖 `verdict` 以 `recommend` 开头的项，`alternative`/`conditional` 是覆盖缺口（即**假护栏**）。已把 A3 加固为「`verdict != exclude` 者一律必须 `ts_declarable == true`」，并把 B1 改造成更贴题意的动作「重新启用被排除的源」。加固后三组全部按预期变红。**这条记录本身就是护栏有效性的证据：护栏被真正打过，而不是写完就宣称有效。**
 
-**最终验收（报告定稿后复跑）**：
+**最终验收（附录 C transcript 写入后，对最终文件复跑）**：
 
 ```
 $ python d9_check.py docs/design/d9-foreign-market-data-source-selection.md
 GREEN — 断言全通过（候选项 10：nt_native 3 / external 7；接口需求 16 条）
 exit=0
 ```
+
+> **关于 sha256 的说明（可验证）**：上面的 `baseline sha256` 是**执行验证那一刻**的报告快照（正文与 §5 登记表已定稿）。把 transcript 文本写进附录 C 会改变文件字节，因此最终文件的 sha256 与它不同——**这不构成问题，因为 A1–A7 七条断言只消费三样东西：§5 的 JSON 登记表、章节标题、`I-xx` 编号；附录 C 的文字不参与任何一条断言**。**已实测**：把附录 C 整段删除后对残余文件复跑，仍为 `exit=0 / GREEN — 断言全通过（候选项 10：nt_native 3 / external 7；接口需求 16 条）`。
 
 ---
 
