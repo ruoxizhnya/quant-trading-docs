@@ -258,7 +258,7 @@ ADR-031 落地的 NT 侧车是**窄定位**：「权重回放 + A 股最小规�
 |---|---|---|
 | 1 | ADR 归属 | ✅ **已收口**：修订 ADR-031（定位扩展记为「决议变更记录」）+ 本文挂为其附件 |
 | 2 | 15 分钟聚合细则（午休断点、集合竞价、停牌日处理） | ✅ 落实施工单成文（工单内容可独立执行验证） |
-| 3 | 因子注册表治理细则（登记人/生效日/哈希算法/回滚流程） | ✅ 参考外部门户 content_hash 先例，实施期定稿 |
+| 3 | 因子注册表治理细则（登记人/生效日/哈希算法/回滚流程） | ✅ **已落实施（2026-10-14，core D4 完成）**：参考外部门户 content_hash 幂等先例——登记四样（公式/哈希/登记人/生效日）fail-closed 缺一拒收 + 回滚不破坏历史复现（新引用 miss / 历史引用 hit）+ 审计留痕（谁/何时/改了什么/为什么）成文于 core `docs/SPEC.md`「因子注册表治理细则（D4）」；实现 `pkg/domain/factor_registration.go` / `pkg/data/factor_governance.go` / `pkg/storage/factor_registration.go`（Migration 053），演练与破坏验证有测试钉住 |
 | 4 | 国外市场数据源选型 | ✅ NT 原生数据通道优先，另调研 → **调研已落档（2026-10-14）**：[design/d9-foreign-market-data-source-selection.md](d9-foreign-market-data-source-selection.md) |
 | 5 | 分期优先级与工单化（六字段写进 core 台账） | ✅ 地基工单最先，因子三期 + NT 原生模式按 §6 |
 | 6 | 多频率进回测的策略视野设计 | ✅ 「日频决策 + 日内特征」先行，分钟级撮合另立工单 |
