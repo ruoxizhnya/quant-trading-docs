@@ -1,6 +1,6 @@
 # ADR-031: 内核可插拔 + 外围服务 NT-ready —— buy vs build 路线（NautilusTrader 侧车，整体替换否决）
 
-> **Status**: **Accepted**（2026-10-12 若曦拍板固化）——阶段 1（契约化）与阶段 2（NT 侧车 PoC）立即执行；**决策门已于 2026-10-14 裁决（若曦拍板）：① 推进生产化**，阶段 3 随 K16 落地，详见 D4 末尾「决策门裁决记录」。
+> **Status**: **Accepted**（2026-10-12 若曦拍板固化）——阶段 1（契约化）与阶段 2（NT 侧车 PoC）立即执行；**决策门已于 2026-10-14 裁决（若曦拍板）：① 推进生产化**，阶段 3 随 K16 落地，详见 D4 末尾「决策门裁决记录」。**决议变更（2026-10-14，若曦拍板）**：内核定位扩展为**双完整核心热转换（路线二）**，见文末「决议变更记录」，附件 = [design/data-factor-unification.md](../design/data-factor-unification.md)。
 > **Date**: 2026-10-12
 > **Category**: Architecture
 > **Related**: [ADR-027](adr-027-modular-decomposition-to-independent-services.md) · [ADR-028](adr-028-tiered-extension-of-strategy-expression-capability.md) · [ADR-029](adr-029-ai-layer-2026-agent-practice-alignment.md) · [ADR-030](adr-030-draft-observed-improvements.md) · core 仓 `docs/design/kernel/nautilus-trader-kernel-evaluation.md`（NT 深度调研，2026-10-12）· core 仓 `docs/design/kernel/kernel-pluggable-nt-ready.md`（需求与设计）· core 仓 `docs/design/kernel/target-architecture-modular-kernel.md`（模块化内核蓝图，D1–D5）
@@ -122,3 +122,35 @@ Dashboard 与 AI 层**近零改造**（只依赖 canonical 结果 schema，不�
 - ~~[TBD] NT 版本锁定策略~~ → **已关闭（决策门裁决一）**：钉 `nautilus_trader==2.0.0rc6`、不追 nightly；正式版发布后按升级预案收口，双跑对齐回归为验收门。
 - ~~[TBD] Parquet 导出的复权口径~~ → **已关闭（K13，§8.2）**：`ohlcv_daily_qfq` 原样消费（不做二次复权）+ UTC 午夜纳秒时间戳。
 - ~~[TBD] 侧车部署形态与监控口径~~ → **已关闭（K16，§8.6）**：compose 服务（`docker-compose.nt.yaml`）+ 健康检查 + 监控指标（`nt_sidecar_calls_total{outcome}` 等）；运维文档在 `guides/nt-sidecar-operations.md`。
+
+---
+
+## 决议变更记录：内核定位扩展为双完整核心热转换（2026-10-14，若曦拍板）
+
+**变更**：NT 定位从 D2 的「信号—权重回放适配器（对拍考官）」**扩展**为**完整第二核心**——路线二：**国内 Go 全栈（策略 + 执行）/ 国外 NT 全栈（全 feature，Python 策略 + 原生执行）/ 外壳共用（RunSpec 路由、ResultSpec 回执、审计、UI）**，按市场**热转换**（配置级切换，非 run 级迁移）。**这是扩展不是推翻**：D1–D5、决策门三裁决、A 股对拍线（国内线 NT 侧车现状）全部维持。
+
+**与本 ADR 各条款的关系**：
+
+| 条款 | 关系 |
+|---|---|
+| D1 四契约 | **维持并升格**——RunSpec `kernel` 路由字段正是热转换的切换载体，四契约同时是拆仓的接口面 |
+| D2 权重回放适配器 | **范围收窄为国内对拍线**；国外线新增 NT 原生模式（数据模型 + 订单类型 + 原生执行），策略用 NT 原生写（新增而非重写，无 6–12 人周包袱） |
+| D3 外围 NT-ready | **维持**，「外壳共用」即其延伸 |
+| D4 决策门三裁决 | **维持**（推进生产化 / VeighNa 取消 / impact 维持 fixed） |
+| D5 Go 约束 | **维持**——NT 全栈指「国外市场策略与执行在 NT 侧车内」，侧车仍是 Python 独立进程、经四契约交互、安全约束不放松 |
+
+**配套蓝图（附件）**：[design/data-factor-unification.md](../design/data-factor-unification.md)——热转换语义五条、性能红线（高频永不跨进程）、规范层 schema、时间语义红线（PIT fail-closed）、因子三元组与热插拔、三期实施路线、拆仓/服务化评估（已归口 ADR-027 复评节）。
+
+**未决处置拍板（2026-10-14，蓝图 §9 七条全按建议落实）**：
+
+| # | 未决 | 处置 |
+|---|---|---|
+| 1 | ADR 归属 | ✅ **修订本 ADR（决议变更）+ 蓝图挂附件**（即本节） |
+| 2 | 15 分钟聚合细则 | 实施工单成文（工单内容可独立执行验证） |
+| 3 | 因子注册表治理细则 | 参考外部门户 content_hash 先例，实施期定稿 |
+| 4 | 国外市场数据源选型 | NT 原生数据通道优先，另调研 |
+| 5 | 分期优先级与工单化 | 地基工单（规范层 + PIT 红线）最先，因子三期 + NT 原生模式按蓝图 §6，六字段写进 core 台账 |
+| 6 | 多频率进回测策略视野 | 「日频决策 + 日内特征」先行，分钟级撮合另立工单 |
+| 7 | 拆仓结论归口 | ✅ 已落 ADR-027 复评节（2026-10-14） |
+
+**文档同步纪律（用户 2026-10-14 指示，固化为流程约束）**：**上层设计（本 ADR / 蓝图）任何变更，必须同步更新下游文档——SPEC（契约 schema）、数据流（data flow / 内核蓝图数据流图）、schema（DB DDL 口径）、ARCHITECTURE.md**；不同步即为变更未完成，评审时按缺项打回。
