@@ -6,6 +6,7 @@
 > **Related**: [ADR-023](adr-023-ai-experimenter-lab.md) · [ADR-024](adr-024-expression-as-execution-target.md) · **[ADR-028](adr-028-tiered-extension-of-strategy-expression-capability.md)（配套：028 定表达能力，本 ADR 定资产住哪个进程）** · **[ADR-029](adr-029-ai-layer-2026-agent-practice-alignment.md)（配套：029 定 tools 门面协议、实验生命周期状态图、可观测性；本 ADR 定服务边界）** · [ADR-020](adr-020-engine-decomposition.md) · [ADR-008](adr-008-inter-service-comm.md) · [PRODUCT.md](../PRODUCT.md)
 > **Supersedes (部分)**: [ODR-021](../archive/odr/odr-021-p1-15-service-merge-risk-execution.md) 的「容器数 7 → 5」结论 —— 见 §2.1，**risk + execution 的合并判断本身保留**，本 ADR 只在其之上重新划分服务边界。⚠️ §2.6 追加策略服务与 reduction-service 后，服务数变为 **5（compose 容器 7）**，方向与 ODR-021 相反，理由见「代价 / 限制」
 > **Reconcile（OBS-10，2026-10-09）**：与 [ADR-019](adr-019-service-merge-ai-copilot.md)（2026-06-11 **Accepted**，7 服务 → 3 服务合并）方向相反需留痕——ADR-019 的**合并判断（risk / execution in-process）经 ODR-021 延续至今且全部保留**，本 ADR 只在其上重新划分独立服务边界；**反转的前提变了**：进程内核模块化（P0–P2）已把 11 个模块的边界 / 契约在进程内划清并冻结（内核线 K0–K7 已闭环），服务拆分是**可选的后续部署形态**而非推翻合并。不留此痕即成「019 说合并、027 说拆开」的自相矛盾。
+> **复评（2026-10-14）**：大双核架构（国内 Go 全栈 / 国外 NT 全栈）落地语境下，用户提出「API/策略/数据层是否再拆独立 repo？摘 repo 是否必须 service 化？」——经复评**不推翻**下文任何裁决，新增「三概念拆解（模块/repo/服务）+ 按契约切不按层切 + monorepo 多 module 优先」裁决，见「复评记录：大双核架构下的拆仓/服务化再评估（2026-10-14 追加）」。完整推导见 [design/data-factor-unification.md §10](../design/data-factor-unification.md)。
 > **依赖方向（OBS-09 澄清，2026-10-09）**：027 → 028 → 029 曾互相引用成环，现澄清为**单向**——[ADR-028](adr-028-tiered-extension-of-strategy-expression-capability.md) / [ADR-029](adr-029-ai-layer-2026-agent-practice-alignment.md) 的**能力与协议**（L2 递推算子 / WASM host API / tools 门面）是本 ADR 服务拆分的**输入**；两者的内核落地部分（K3 / K6 / K7）已先行在进程内落地，**不构成本 ADR 的前置**。三份中唯一「待落地主体」是本 ADR 的服务拆分（5→7）；028 / 029 引用本 ADR 服务边界的条目已标注「待落地后重评」。
 > **Upstream**: 用户（若曦）2026-10-06 裁决 ——
 > 前三项（拆分形态 / storage 处置 / 死数据管道）+ 三轮头脑风暴追加六项
@@ -82,6 +83,54 @@ AI 边界护栏白名单同步收敛为 `[pkg/ai, cmd, e2e]`（`pkg/tools` 已�
 
 `ai/expression` / `ai/contracts` 在 §2.6.3、§5、§⑭ 等处是 **2026-10-06 的历史诊断记录**，按 ADR 惯例保留原样；**现行路径以本节为准**。其它文档已同步：`ARCHITECTURE.md`、`TASKS.md`、`ADR-028`、`ADR-030`。
 `ADR-015` 的包清单是 S7 阶段历史记录（其中 `expression/types.go`、`builtins.go` 在本步之前就已改名，属既有漂移），不再逐处修订。
+
+---
+
+## 复评记录：大双核架构下的拆仓 / 服务化再评估（2026-10-14 追加）
+
+**触发**：大双核架构（路线二：国内 Go 全栈 / 国外 NT 全栈，见 [design/data-factor-unification.md](../design/data-factor-unification.md)）拍板后，用户提出：core 仓越来越大（实测 **80,363 行生产 Go / 76 包 / 35 个 `pkg/` 目录**，对比本 ADR 创建时 ≈78.6k 行 / 91 包——AI 摘出后行数微增、包数收敛），要不要把 **API 层 / 策略层 / 数据层**再摘出独立 repo 分别维护？摘出独立 repo 是否意味着必须做成 service、把内联调用变成 HTTP / message queue？性能代价是否可承受？
+
+**复评结论：下文既有裁决全部维持，不推翻；本次只补三个增量。**
+
+### 增量①：三个概念必须拆开（本 ADR 原文默认读者已分清，此处钉死）
+
+| 维度 | 是什么 | 性能影响 | 解决什么问题 |
+|---|---|---|---|
+| **拆模块** | 进程内包边界 + 编译期护栏（`internal/repoguard`） | **零** | 认知负担、边界腐蚀 |
+| **拆 repo** | git 仓库 / 编译边界（多仓 或 多 module 单仓） | **零**（编译期事，运行时调用不变） | 发布节奏差、协作/许可边界 |
+| **拆服务** | 进程边界 + 网络调用（HTTP/MQ） | **有**（每跳一次网络往返） | 独立伸缩、独立部署 |
+
+**「摘 repo 就要变 HTTP/MQ」是把 repo 和 service 捆死的误解**——Go 有多 module 单仓 / `go.work` 第三条路：编译边界强制（越界 import 直接编译失败，分层从「约定」升格为「编译器强制」），运行时**零网络开销**。拆 repo 的收益 80% 来自编译边界，不来自 git 边界。
+
+### 增量②：大双核给了比「按层切」更自然的缝——按契约切
+
+用户问的「API 层 / 策略层 / 数据层」按**旧分层**切是伪需求：层与层之间是高频调用（逐 Bar 取数、信号求值、撮合），切开必然付网络税（§Context⑬ per-day HTTP 陷阱同款）。四契约（RunSpec / SignalSpec / ResultSpec / EngineRunner，见数据因子蓝图 §2.1）才是真缝——跨契约的全是**低频**调用（run 级提交/回执、因子定义拉取「开跑前 1 次」、connector 同步）：
+
+```
+按「契约」切，不按「层」切：
+  壳仓（api 路由 + ResultSpec 消费 + 审计 + UI 消费面）   ← 低频，可 service 化
+  核仓（Go 回测执行 + 规范层 + connector）              ← 高频，永不跨进程
+  nt-sidecar 仓（已独立，Python）                        ← 先例：语言/发布节奏差是拆 repo 的正当理由
+  agent 仓（已独立，AI 链路）                            ← 先例
+```
+
+### 增量③：三步走与判据（与 §5 的 8 步同向，新增 repo 维度）
+
+1. **先拆模块，不拆 repo**：按 §5 的进程内模块化路线走完，`internal/repoguard` 护栏 + 编译边界强制分层。**80k 行的病根是边界不清，不是仓库不够多**——本步直接吃掉「认知负担」的大头。
+2. **repo 边界按四契约切，且优先 monorepo 多 module（`go.work` 联调）**：壳 / 核 / nt-sidecar / agent 四 module。**暂不真拆多 git 仓库**——单人实验室「发布节奏差 / 协作边界 / 许可边界」三条真拆 repo 的正当理由均不成立（nt-sidecar 因 Python 天然独立是唯一例外）。
+3. **服务化只在真需要独立伸缩/部署处做**（即本 ADR §2 的 5→7 方案），且**只走低频路径**；高频路径（逐 Bar provider / 信号 / 撮合）**永驻进程内**（数据因子蓝图 §2.2 性能红线）。
+
+**判据表（何时才真的该拆）**：
+
+| 触发条件 | 该做什么 | 现在成立吗 |
+|---|---|---|
+| 跨仓发布节奏差（不同生命周期/语言/团队） | 拆 repo | ✅ nt-sidecar、agent（已做）；❌ 核/壳（同节奏） |
+| 编译边界被反复腐蚀（越界 import 时有发生） | 拆 module + 护栏 | ⚠️ 部分（repoguard 已在，覆盖待补） |
+| 单一服务需独立伸缩（回测 CPU 密集 vs API IO 密集） | 拆 service | ❌ 单机未到瓶颈 |
+| 分布式事务/一致性需求 | **别拆** | — |
+| 单人维护、无独立运维人力 | **别拆 service**（§2「运维灾难」明文） | ✅ 现状 |
+
+**与本 ADR 的关系声明**：以上不修改 §2 三簇分治、§4 数据归属 A/B、§5 迁移顺序的任何条款；§5 的「服务拆分是可选的后续部署形态」结论**维持**。若将来执行增量②的 monorepo 多 module 切分，按 §6 门禁惯例把 module 边界写成编译/测试断言即可，不需要新的服务契约。
 
 ---
 

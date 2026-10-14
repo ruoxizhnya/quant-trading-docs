@@ -100,7 +100,7 @@ NT 定位扩展——从「权重回放对拍考官」升格为**完整第二核
 
 - **完整蓝图**：[design/data-factor-unification.md](design/data-factor-unification.md)（双核热转换语义、性能红线、规范层 schema、时间语义红线 PIT、因子体系、三期实施路线、拆仓/服务化评估）
 - **与 ADR-031 关系**：扩展其内核定位（不推翻既有裁决），正式 ADR 修订待收口（蓝图 §9 未决 #1）。
-- **拆仓结论**：摘 repo ≠ 必须 service 化——按「契约」切（四契约即接口面）而非按「层」切，monorepo 多 module 优先，高频路径永不跨进程（蓝图 §10，归口 ADR-027 复评）。
+- **拆仓结论**：摘 repo ≠ 必须 service 化——按「契约」切（四契约即接口面）而非按「层」切，monorepo 多 module 优先，高频路径永不跨进程（已归口 [ADR-027](adr/adr-027-modular-decomposition-to-independent-services.md) 复评节，2026-10-14；推导见蓝图 §10）。
 
 > 以上两节是**目标形态，尚未实施**（模块化内核分期路线 P0 契约冻结 → P1 内核骨架 → …，见内核蓝图 §10；大双核实施路线见数据因子蓝图 §6）。当前实现见下文各章节。
 
