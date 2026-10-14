@@ -101,8 +101,24 @@ NT 定位扩展——从「权重回放对拍考官」升格为**完整第二核
 - **完整蓝图**：[design/data-factor-unification.md](design/data-factor-unification.md)（双核热转换语义、性能红线、规范层 schema、时间语义红线 PIT、因子体系、三期实施路线、拆仓/服务化评估）
 - **与 ADR-031 关系**：扩展其内核定位（不推翻既有裁决），已按「决议变更记录」落档 ADR-031、蓝图挂附件（2026-10-14 收口）；上层设计变更须同步 SPEC / data flow / schema / ARCHITECTURE（蓝图维护节）。
 - **拆仓结论**：摘 repo ≠ 必须 service 化——按「契约」切（四契约即接口面）而非按「层」切，monorepo 多 module 优先，高频路径永不跨进程（已归口 [ADR-027](adr/adr-027-modular-decomposition-to-independent-services.md) 复评节，2026-10-14；推导见蓝图 §10）。
+- **已实施（D7，2026-10-14）**：**NT 原生模式 + 市场→内核路由**。
+  - 侧车新增 market 档案表（`nt-sidecar/sidecar/markets.py`）与原生执行通道
+    （`sidecar/native.py`，NT 自带订单类型与执行模型，不做 A 股规则魔改）；
+    `--market` 缺省 `CN` ⇒ 国内对拍线行为逐字不变。
+  - 路由侧 `kernel_routing.markets`（如 `CN → go` / `US → nautilus`）配置驱动；
+    `POST /api/backtest` 的可选 `market` 字段在**路由之前**解析成内核名写进既有的
+    `kernel` 字段 —— **四契约零改动**（D7 ④「只用既有 kernel 字段」）。
+  - 两层均 fail-closed：未登记市场在路由侧 400（点名市场 + 已登记集合）、在执行侧
+    装配期退出；**任何一层都不回退**到 go 内核 / CN 档案。
+  - 回执「外壳共用」有跨语言机械护栏：侧车回执字段名必须落在
+    `contracts.BacktestResponse` 的 json tag 集合内（重命名与侧车专属键逐条登记）。
+  - ⚠️ **未实施**：国外真实数据源（D9 选型已落档，接入另立）；`sector` 等国内线
+    其余缺口与此无关。
+  - 运维/配置细节：[guides/nt-sidecar-operations.md](guides/nt-sidecar-operations.md) §4。
 
-> 以上两节是**目标形态，尚未实施**（模块化内核分期路线 P0 契约冻结 → P1 内核骨架 → …，见内核蓝图 §10；大双核实施路线见数据因子蓝图 §6）。当前实现见下文各章节。
+> 以上两节是**目标形态**（模块化内核分期路线 P0 契约冻结 → P1 内核骨架 → …，见内核蓝图 §10；
+> 大双核实施路线见数据因子蓝图 §6）。**已实施的部分逐条标注了工单号与日期**（当前：D1 规范层
+> 与翻译层、D7 NT 原生模式 + 市场路由）；未标注的仍是目标形态。当前实现见下文各章节。
 
 > ⚠️ **下文各章节是"当前实现的 Reference 细节"**，可能领先或落后于目标形态。**以代码为准**；若发现本文与代码不符，改代码或改本文，不要两边都留着。
 

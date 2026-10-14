@@ -1,12 +1,15 @@
 ---
 status: evergreen
 type: how-to
-last-verified: 2026-10-13
+last-verified: 2026-10-14
 verified-by: K16 ③ 交付时逐条对代码核实——§1 三条纪律与 API 盯防清单来自
   core 仓 `docs/design/kernel/kernel-pluggable-nt-ready.md` §8.5（2026-10-13 裁决）；
   §2 fail-closed 语义经 dualrun 停侧车实测（exit=1 点名 kernel "nautilus" unreachable）；
-  §3 命令与 nt-sidecar/README.md §2 逐字核对；§4 指标名与 `pkg/observability/metrics.go`
-  核对；§5 微坑全部来自 K15-R1 / K16 ② 实测踩坑记录
+  §3 命令与 nt-sidecar/README.md §2 逐字核对；§5 指标名与 `pkg/observability/metrics.go`
+  核对；§6 微坑全部来自 K15-R1 / K16 ② 实测踩坑记录。
+  §4（D7 市场档案与原生模式）由 D7 交付时核实：`--market` 参数与
+  `sidecar/markets.py` 的档案表逐字核对；§4.4 的两处导出缺陷经真库实测复现，
+  并已验证「补齐后重导 catalog ⇒ `cmd/dualrun -gate` 全绿」（2026-10-14）。
 ---
 
 # NT 侧车运维：版本升级与故障回退
@@ -36,7 +39,7 @@ ashare.py）。Go 核心、四契约、ResultSpec 冻结字段全部绝缘。最
 1. **版本 pin**：`nt-sidecar/requirements.txt` 锁**精确版本**
    （当前 `nautilus_trader==2.0.0rc6`），无 `>=`/`~=`，不追 nightly；
    Dockerfile 注释同步标注 pin 理由。
-2. **升级预案即交付物**：升级完成时本文档 §1 与 §5 必须同步更新
+2. **升级预案即交付物**：升级完成时本文档 §1 与 §6 必须同步更新
    （API 面变化、新踩的坑），否则工单不算收口。
 3. **只盯三个真正在我们面上的 API 面**（其余 breaking change 不管——
    Rust 侧类型、IB/Kraken 等我们不用的适配器都在爆炸半径外）：
@@ -62,7 +65,7 @@ ashare.py）。Go 核心、四契约、ResultSpec 冻结字段全部绝缘。最
    先归因再收口，不得放宽阈值。
 4. **门禁模式终验**：`go run ./cmd/dualrun -strategy bh -gate` exit=0。
 5. **收口**：更新本文档 frontmatter `last-verified` / §1.1 当前版本号 /
-   §5 新坑；升级工单以「对齐回归绿」为验收门关闭。
+   §6 新坑；升级工单以「对齐回归绿」为验收门关闭。
 
 **验收门 = 对齐回归**。Python 测试绿但双跑超阈 = 升级未通过——那说明
 数值行为变了，必须归因（价源/费用/撮合）而不是调阈值。
@@ -94,7 +97,7 @@ ashare.py）。Go 核心、四契约、ResultSpec 冻结字段全部绝缘。最
 2. 此后所有回测走 go 内核（RunSpec 不带 `kernel` 或带 `"go"`）；
    仍带 `"kernel":"nautilus"` 的请求会**显式被拒**（点名内核名），
    不会拿到一份冒充的 go 结果。
-3. 停侧车进程（按 §5 的端口清单确认真停了）。
+3. 停侧车进程（按 §6 的端口清单确认真停了）。
 4. 恢复时反向操作：起侧车 → `/healthz` 200 → `NT_SIDECAR_ENABLED=1`
    重启服务 → 跑一条 `kernel:nautilus` 回测确认 round trip 成功。
 
@@ -122,7 +125,71 @@ cd nt-sidecar
 
 ---
 
-## 4. 监控口径
+## 4. 市场档案与 NT 原生模式（D7）
+
+D7 给侧车加了**第二条执行通道**：A 股线（`weight_replay` + 最小规则集）不动，
+新增**国外线 NT 原生模式**——NT 自带的订单类型与执行模型，**不做 A 股规则魔改**
+（无 T+1、无涨跌停、无整手）。依据：ADR-031「决议变更记录」+ 蓝图 §2.1（按市场
+热转换，配置级切换）。
+
+### 4.1 两层配置，各管一段（不要混）
+
+| 层 | 位置 | 管什么 |
+|---|---|---|
+| **路由** | core 仓 `config/analysis-service.yaml` → `kernel_routing.markets`（如 `CN: go`、`US: nautilus`） | 「哪个市场由哪个内核跑」。`POST /api/backtest` 接受可选的 `market` 字段，在路由**之前**解析成内核名写进既有的 `kernel` 字段 —— 四契约零改动（D7 ④） |
+| **执行** | 侧车启动参数 `--market`（§4.2） | 「NT 内核跑这个市场时用哪套原生规则」：币种、精度、费率模型、执行模式。表在 `sidecar/markets.py` 的 `MARKET_PROFILES` |
+
+两层都 fail-closed：未登记市场在**路由侧** 400（点名市场 + 已登记集合），在**执行侧**
+装配期直接退出（`MarketError`）。**任何一层都不回退**——回退的代价不是报错，而是
+一份用错规则/内核算出来的、看起来完全正常的回执（FR-1.3 的病，换了个维度）。
+
+### 4.2 起一个国外市场的侧车
+
+```bash
+cd nt-sidecar
+.venv/bin/python -m sidecar --port 19100 --market US --catalog <us-catalog>
+```
+
+- `--market` 缺省 `CN`：不带该参数的启动命令行为**逐字不变**。
+- **一个侧车实例服务一个市场**：US 档案的实例只跑该市场的样本数据；CN 对拍线的
+  实例仍按 §3 起（`--market` 不传）。
+- 档案与 catalog 必须配套：US 档案要求 catalog 里的 instrument 是 USD 计价的
+  （否则 `resolve_instruments` 找不到，显式报错）。
+
+### 4.3 加一个新市场（三步，零路由代码改动）
+
+1. `sidecar/markets.py` 的 `MARKET_PROFILES` 加一行（币种 / 精度 / 费率模型 / 执行模式）。
+2. `config/analysis-service.yaml` 的 `kernel_routing.markets` 加一行（市场 → 内核）。
+3. 为该市场准备数据 connector + catalog（本工单范围外，见 D9 选型报告）。
+
+### 4.4 已知阻断（2026-10-14，**不属于 D7**，登记在此因为影响本节运维动作）
+
+§3 说「底表刷新后重跑导出」——**该动作当前会失败**。两处独立缺陷，都在 D1
+（commit `b49629e`）引入的导出路径上：
+
+1. **字段名不匹配**：`tools/export_bars.py` 的 SELECT 返回数据库列名 `trade_date`，
+   而翻译层 `mapping.BAR_FIELD_MAP` 按**规范层字段名** `date` 取值 ⇒
+   `KeyError: mapping: 行数据缺少规范层字段 'date'`。
+2. **成交量严格化 vs 真实数据**：翻译层的 `as_quantity` 拒绝非整数成交量（"取整会
+   悄悄改口径"，立意正确）；而刷新后的 `ohlcv_daily_qfq.volume` 是**带两位小数的
+   手**（实测抽样 30 万行，81.5% 非整数）⇒ `ValueError`。
+
+**后果**：`cmd/dualrun -gate` 用的 catalog **无法按文档动作刷新**。SYNC-01 之后调度器
+已会真的同步底表（复权基准因此移动、volume 精度变化），于是对拍门禁会因**产物陈旧**
+而红——看起来像数值分歧，实际是产物过期。
+
+**实测证据（2026-10-14）**：把上面两处临时补齐后重导 catalog，再跑
+`go run ./cmd/dualrun -strategy bh -gate`，输出
+「对齐门禁通过：全部指标在 K15 阈值内，确定性腿一致，无成交 mismatch」——
+**对齐本身完好，红灯纯属产物陈旧**。
+
+**为什么不当场修**：第 2 条是**口径裁决**（成交量单位：手 vs 股，取整/换算发生在
+规范层还是翻译层，见 `mapping.py` 的「换算请在规范层做」注释），改它会动国内线的
+数值；D7 的 ④ 约束明令「不动国内对拍线现状」。须另立工单把口径定死后修。
+
+---
+
+## 5. 监控口径
 
 | 盯什么 | 指标 | 说明 |
 |---|---|---|
@@ -136,7 +203,7 @@ cd nt-sidecar
 
 ---
 
-## 5. 已知微坑（排查时先排除这些）
+## 6. 已知微坑（排查时先排除这些）
 
 1. **Windows 端口复用绑定（高频）**：9100 可同时被多个进程监听，连接随机
    分配到新旧代码 ⇒ 「同请求不同结果」诡异现象先查
